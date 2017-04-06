@@ -56,6 +56,7 @@
     <Compile Include="ProjectEntry.cs" />
     <Compile Include="ProjectJsonUtil.cs" />
     <Compile Include="ProjectType.cs" />
+    <Compile Include="ProjectUtil.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SolutionUtil.cs" />
   </ItemGroup>
