@@ -16,7 +16,7 @@ namespace ConvertPackageRef
         public static void Main(string[] args)
         {
             var converter = new PackageReferenceConverter(ParseFixedSet());
-            converter.ConvertSolution(@"e:\code\roslyn\Compilers.sln");
+            converter.ConvertSolution(@"e:\code\roslyn\Roslyn.sln");
         }
 
         private static HashSet<string> ParseFixedSet()

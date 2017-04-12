@@ -22,6 +22,8 @@ namespace ConvertPackageRef
         private readonly string _filePath;
         private readonly XDocument _document;
 
+        internal string ProjectName => Path.GetFileNameWithoutExtension(_filePath);
+
         internal bool IsPclProject
         {
             get
@@ -49,6 +51,8 @@ namespace ConvertPackageRef
                 return elem != null;
             }
         }
+
+        internal bool IsSharedProject => Path.GetExtension(_filePath) == ".shproj";
 
         internal bool IsExe
         {
@@ -78,8 +82,14 @@ namespace ConvertPackageRef
             {
                 ConvertDesktopProject();
             }
+            else if (IsSharedProject)
+            {
+                // Nothing to do for shared projects
+                return;
+            }
             else
             {
+                Console.WriteLine($"Unknown project {Path.GetFileName(_filePath)}");
                 return;
             }
 
@@ -96,17 +106,20 @@ namespace ConvertPackageRef
             var project = propsElement.Attribute("Project");
             project.Value = Path.Combine(Path.GetDirectoryName(project.Value), "SettingsSdk.props");
 
-            var sdkPropsImport = new XElement(importName);
-            sdkPropsImport.Add(new XAttribute("Project", "Sdk.props"));
-            sdkPropsImport.Add(new XAttribute("Sdk", "$(MicrosoftNetSdkVersion)"));
-            propsElement.AddAfterSelf(sdkPropsImport);
-
             var tfiElement = _document.XPathSelectElements("//mb:TargetFrameworkIdentifier", _manager).Single();
             var tfElement = new XElement(_namespace.GetName("TargetFramework"), GetTargetFrameworkValue());
             tfiElement.AddBeforeSelf(tfElement);
             tfiElement.Remove();
             _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).Single().Remove();
             MaybeAddPackageTargetFallback(tfElement);
+
+            // TODO: this affects project like ResultsProvider.  Check with tmat to make
+            // sure this is okay.
+            var tfpElement = _document.XPathSelectElements("//mb:TargetFrameworkProfile", _manager).FirstOrDefault();
+            if (tfpElement != null)
+            {
+                tfpElement.Remove();
+            }
 
             if (!SkipPackageReferenceMerge())
             {
@@ -139,6 +152,9 @@ namespace ConvertPackageRef
                 || name == "CscCore";
         }
 
+        /// <summary>
+        /// Convert the frameworks / imports section of the project.json to a PackageTargetFallback element
+        /// </summary>
         private void MaybeAddPackageTargetFallback(XElement target)
         {
             var json = GetProjectJsonFilePath();
@@ -163,6 +179,13 @@ namespace ConvertPackageRef
                     prop = cur;
                     break;
                 }
+
+                if (cur.Name.ToLower().Contains("profile7"))
+                {
+                    var fallback = new XElement(_namespace.GetName("PackageTargetFallback"), "portable-net45+win8");
+                    target.AddAfterSelf(fallback);
+                    return;
+                }
             }
 
             if (prop == null)
@@ -181,7 +204,6 @@ namespace ConvertPackageRef
             {
                 return;
             }
-
 
             var importValue = imports.Value;
             string content = null;
@@ -204,6 +226,38 @@ namespace ConvertPackageRef
             {
                 var fallback = new XElement(_namespace.GetName("PackageTargetFallback"), content);
                 target.AddAfterSelf(fallback);
+            }
+        }
+
+        /// <summary>
+        /// Convert the runtimes section to the RuntimeIdentifiers section
+        /// </summary>
+        private void MaybeAddRuntimeIdentifiers(XElement target)
+        {
+            var json = GetProjectJsonFilePath();
+            if (!File.Exists(json))
+            {
+                return;
+            }
+
+            var obj = JObject.Parse(File.ReadAllText(json), new JsonLoadSettings() { CommentHandling = CommentHandling.Load });
+            var runtimes = (JObject)obj["runtimes"];
+            if (runtimes == null)
+            {
+                return;
+            }
+
+            string content = null;
+            foreach (var cur in runtimes.Properties())
+            {
+                var item = cur.Name;
+                content = (content == null) ? item : $"{content};{item}";
+            }
+
+            if (content != null)
+            {
+                var e = new XElement(_namespace.GetName("RuntimeIdentifiers"), content);
+                target.AddAfterSelf(e);
             }
         }
 
@@ -232,15 +286,18 @@ namespace ConvertPackageRef
         {
             var itemGroup = GetPackageReferenceInsertElement();
             ConvertPackageReferences(inlineVersion: false);
+
+            var tfvElement = _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).Single();
+            MaybeAddRuntimeIdentifiers(tfvElement);
             RemoveProjectJson();
         }
 
+        // TODO: make sure to not disrupt package references that already exist
         internal void ConvertPackageReferences(bool inlineVersion)
         {
             var itemGroup = GetPackageReferenceInsertElement();
-            var packageRefName = SharedUtil.MSBuildNamespace.GetName("PackageReference");
+            var packageRefName = _namespace.GetName("PackageReference");
             var includeName = XName.Get("Include");
-            var versionName = SharedUtil.MSBuildNamespace.GetName("Version");
             foreach (var package in GetProjectJsonDependencies())
             {
                 // TODO: this should work now.
@@ -256,13 +313,17 @@ namespace ConvertPackageRef
                 var elem = new XElement(packageRefName);
                 elem.Add(new XAttribute(includeName, package.Name));
 
-                if (inlineVersion)
+                if (inlineVersion && !package.ExcludeCompile)
                 {
                     elem.Add(new XAttribute("Version", versionString));
                 }
                 else
                 {
-                    elem.Add(new XElement(versionName, versionString));
+                    elem.Add(new XElement(_namespace.GetName("Version"), versionString));
+                    if (package.ExcludeCompile)
+                    {
+                        elem.Add(new XElement(_namespace.GetName("ExcludeAssets"), "compile"));
+                    }
                 }
 
                 itemGroup.Add(elem);
@@ -272,6 +333,11 @@ namespace ConvertPackageRef
         private ImmutableArray<NuGetPackage> GetProjectJsonDependencies()
         {
             var json = GetProjectJsonFilePath();
+            if (!File.Exists(json))
+            {
+                return ImmutableArray<NuGetPackage>.Empty;
+            }
+
             return ProjectJsonUtil.GetDependencies(json);
         }
 

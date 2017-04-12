@@ -40,61 +40,13 @@ namespace RepoUtil
             return builder.ToImmutable();
         }
 
-        /// <summary>
-        /// Change the NuGet dependencies in the file to match the new packages.
-        /// </summary>
-        internal static bool ChangeDependencies(string filePath, ImmutableDictionary<NuGetPackage, NuGetPackage> changeMap)
-        {
-            var obj = JObject.Parse(File.ReadAllText(filePath), new JsonLoadSettings() { CommentHandling = CommentHandling.Load });
-            var dependencies = (JObject)obj["dependencies"];
-            if (dependencies == null)
-            {
-                return false;
-            }
-
-            var changed = false;
-            foreach (var prop in dependencies.Properties())
-            {
-                var currentPackage = ParseDependency(prop);
-                NuGetPackage newPackage;
-                if (!changeMap.TryGetValue(currentPackage, out newPackage))
-                {
-                    continue;
-                }
-
-                ChangeDependency(prop, newPackage.Version);
-                changed = true;
-            }
-
-            if (!changed)
-            {
-                return false;
-            }
-
-            var data = JsonConvert.SerializeObject(obj, Formatting.Indented);
-            File.WriteAllText(filePath, data);
-            return true;
-        }
-
-        private static void ChangeDependency(JProperty prop, string version)
-        {
-            if (prop.Value.Type == JTokenType.String)
-            {
-                prop.Value = version;
-            }
-            else
-            {
-                var obj = (JObject)prop.Value;
-                obj["version"] = version;
-            }
-        }
-
-        /// <summary>
+        /// <summary
         /// Parse out a dependency entry from the project.json file.
         /// </summary>
         internal static NuGetPackage ParseDependency(JProperty prop)
         {
             var name = prop.Name;
+            var excludeCompile = false;
 
             string version;
             if (prop.Value.Type == JTokenType.String)
@@ -103,31 +55,16 @@ namespace RepoUtil
             }
             else
             {
-                version = ((JObject)prop.Value).Value<string>("version");
-            }
-
-            return new NuGetPackage(name, version);
-        }
-
-        internal static bool VerifyTracked(string sourcesPath, IEnumerable<FileName> fileNames)
-        {
-            var set = new HashSet<FileName>(fileNames);
-            var allGood = true;
-
-            foreach (var file in Directory.EnumerateFiles(sourcesPath, "project.json", SearchOption.AllDirectories))
-            {
-                var relativeName = file.Substring(sourcesPath.Length + 1);
-                var fileName = new FileName(sourcesPath, relativeName);
-                if (set.Contains(fileName) || !NeedsTracking(file))
+                var obj = (JObject)prop.Value;
+                version = obj.Value<string>("version");
+                var exclude = obj.Property("exclude");
+                if (exclude != null && exclude.Value.ToString() == "compile")
                 {
-                    continue;
+                    excludeCompile = true;
                 }
-
-                Console.WriteLine($"Need to track {fileName}");
-                allGood = false;
             }
 
-            return allGood;
+            return new NuGetPackage(name, version, excludeCompile);
         }
 
         internal static IEnumerable<string> GetProjectJsonFiles(string sourcesPath)
