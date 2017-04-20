@@ -131,17 +131,26 @@ namespace ConvertPackageRef
             // Remove ToolsVersion
         }
 
+        /// <summary>
+        /// Calculate the TFM needed for New SDK projects.  In most cases could read this from the "frameworks" section
+        /// of the project.json file.  For now just special casing the odd scenarios
+        /// </summary>
         internal string GetTargetFrameworkValue()
         {
             if (IsExe)
             {
-                return "netcoreapp1.0";
+                return "netcoreapp1.1";
             }
 
-            var name = Path.GetFileNameWithoutExtension(_filePath);
-            return name == "MSBuildTask"
-                ? "netstandard1.5"
-                : "netstandard1.3";
+            switch (Path.GetFileNameWithoutExtension(_filePath))
+            {
+                case "MSBuildTask":
+                    return "netstandard1.5";
+                case "TestUtilities.CoreClr":
+                    return "netstandard1.6";
+                default:
+                    return "netstandard1.3";
+            }
         }
 
         internal bool SkipPackageReferenceMerge()
@@ -149,7 +158,8 @@ namespace ConvertPackageRef
             var name = Path.GetFileNameWithoutExtension(_filePath);
             return name == "CodeAnalysis"
                 || name == "CSharpCodeAnalysis"
-                || name == "CscCore";
+                || name == "CscCore"
+                || name == "DeployCoreClrTestRuntime";
         }
 
         /// <summary>
@@ -401,7 +411,7 @@ namespace ConvertPackageRef
         private string GetPackageVersionPropertyName(NuGetPackage package)
         {
             var name = package.Name.Replace(".", "");
-            var key = $"{name}FixedVersion{package.Version}";
+            var key = $"{name}FixedVersion:{package.Version}";
             if (_isFixedMap.Contains(key))
             {
                 return $"{name}FixedVersion";

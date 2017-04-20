@@ -17,6 +17,7 @@ namespace ConvertPackageRef
         {
             var converter = new PackageReferenceConverter(ParseFixedSet());
             converter.ConvertSolution(@"e:\code\roslyn\Roslyn.sln");
+            converter.ConvertSolution(@"e:\code\roslyn\src\Samples\Samples.sln");
         }
 
         private static HashSet<string> ParseFixedSet()
@@ -29,7 +30,7 @@ namespace ConvertPackageRef
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in group.Elements())
             {
-                var key = $"{e.Name}:{e.Value}";
+                var key = $"{e.Name.LocalName}:{e.Value}";
                 set.Add(key);
             }
 
