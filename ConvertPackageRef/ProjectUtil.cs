@@ -52,6 +52,15 @@ namespace ConvertPackageRef
             }
         }
 
+        internal bool IsNewSdk
+        {
+            get
+            {
+                var elem = _document.XPathSelectElements("//mb:TargetFramework", _manager).FirstOrDefault();
+                return elem != null;
+            }
+        }
+
         internal bool IsSharedProject => Path.GetExtension(_filePath) == ".shproj";
 
         internal bool IsExe
@@ -82,9 +91,9 @@ namespace ConvertPackageRef
             {
                 ConvertDesktopProject();
             }
-            else if (IsSharedProject)
+            else if (IsSharedProject || IsNewSdk)
             {
-                // Nothing to do for shared projects
+                // No need to convert
                 return;
             }
             else
@@ -112,6 +121,12 @@ namespace ConvertPackageRef
             tfiElement.Remove();
             _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).Single().Remove();
             MaybeAddPackageTargetFallback(tfElement);
+
+            if (IsExe)
+            {
+                MaybeAddRuntimeIdentifiers(tfElement);
+                RemoveLegacyNugetProperties();
+            }
 
             // TODO: this affects project like ResultsProvider.  Check with tmat to make
             // sure this is okay.
@@ -160,6 +175,26 @@ namespace ConvertPackageRef
                 || name == "CSharpCodeAnalysis"
                 || name == "CscCore"
                 || name == "DeployCoreClrTestRuntime";
+        }
+
+        /// <summary>
+        /// Remove all of the MSBuild elements we kept around for our legacy NuGet restore scenarios
+        /// </summary>
+        private void RemoveLegacyNugetProperties()
+        {
+            var elem = _document.XPathSelectElement("//mb:RuntimeIndentifier", _manager);
+            if (elem != null)
+            {
+                if (elem.PreviousNode is XComment)
+                {
+                    elem.PreviousNode.Remove();
+                }
+
+                elem.Remove();
+            }
+
+            elem = _document.XPathSelectElement("//mb:NuGetRuntimeIdentifier", _manager);
+            elem?.Remove();
         }
 
         /// <summary>
