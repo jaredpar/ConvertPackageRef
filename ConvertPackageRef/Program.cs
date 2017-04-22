@@ -15,9 +15,20 @@ namespace ConvertPackageRef
     {
         public static void Main(string[] args)
         {
+            var baseDir = @"e:\code\roslyn";
+            var solutions = new[]
+            {
+                @"Roslyn.sln",
+                @"src\Samples\Samples.sln",
+                @"src\Setup\Templates\Templates.sln",
+                @"src\Setup\DevDivInsertionFiles\DevDivInsertionFiles.sln",
+            };
             var converter = new PackageReferenceConverter(ParseFixedSet());
-            converter.ConvertSolution(@"e:\code\roslyn\Roslyn.sln");
-            converter.ConvertSolution(@"e:\code\roslyn\src\Samples\Samples.sln");
+            foreach (var solution in solutions)
+            {
+                var path = Path.Combine(baseDir, solution);
+                converter.ConvertSolution(path);
+            }
         }
 
         private static HashSet<string> ParseFixedSet()
