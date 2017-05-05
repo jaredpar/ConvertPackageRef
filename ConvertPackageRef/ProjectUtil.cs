@@ -18,6 +18,7 @@ namespace ConvertPackageRef
     {
         private readonly XNamespace _namespace = SharedUtil.MSBuildNamespace;
         private readonly XmlNamespaceManager _manager;
+        private readonly Dictionary<string, string> _packageMap;
         private readonly HashSet<string> _isFixedMap;
         private readonly string _filePath;
         private readonly XDocument _document;
@@ -72,10 +73,11 @@ namespace ConvertPackageRef
             }
         }
 
-        internal ProjectUtil(string filePath, HashSet<string> isFixedMap)
+        internal ProjectUtil(string filePath, Dictionary<string, string> packageMap, HashSet<string> isFixedMap)
         {
             _manager = new XmlNamespaceManager(new NameTable());
             _manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
+            _packageMap = packageMap;
             _isFixedMap = isFixedMap;
             _filePath = filePath;
             _document = XDocument.Load(_filePath);
@@ -128,8 +130,6 @@ namespace ConvertPackageRef
                 RemoveLegacyNugetProperties();
             }
 
-            // TODO: this affects project like ResultsProvider.  Check with tmat to make
-            // sure this is okay.
             var tfpElement = _document.XPathSelectElements("//mb:TargetFrameworkProfile", _manager).FirstOrDefault();
             if (tfpElement != null)
             {
@@ -175,6 +175,13 @@ namespace ConvertPackageRef
                 || name == "CSharpCodeAnalysis"
                 || name == "CscCore"
                 || name == "DeployCoreClrTestRuntime";
+        }
+
+        internal bool AllowDirectPackageReferenceVersions()
+        {
+            var name = Path.GetFileNameWithoutExtension(_filePath);
+            return name == "RoslynInsertionTool.CommandLine"
+                || name == "RoslynInsertionTool";
         }
 
         /// <summary>
@@ -337,7 +344,6 @@ namespace ConvertPackageRef
             RemoveProjectJson();
         }
 
-        // TODO: make sure to not disrupt package references that already exist
         internal void ConvertPackageReferences(bool inlineVersion)
         {
             var itemGroup = GetPackageReferenceInsertElement();
@@ -353,8 +359,7 @@ namespace ConvertPackageRef
                     continue;
                 }
 
-                var propName = GetPackageVersionPropertyName(package);
-                var versionString = $"$({propName})";
+                var versionString = GetPackageVersionValue(package);
                 var elem = new XElement(packageRefName);
                 elem.Add(new XAttribute(includeName, package.Name));
 
@@ -435,6 +440,12 @@ namespace ConvertPackageRef
                 return itemGroup;
             }
 
+            itemGroup = FindPackageReferenceItemGroup();
+            if (itemGroup != null)
+            {
+                return itemGroup;
+            }
+
             var groups = _document.XPathSelectElements("//mb:ItemGroup", _manager);
             var last = groups.Last();
             var next = last.NextNode;
@@ -443,29 +454,44 @@ namespace ConvertPackageRef
             return itemGroup;
         }
 
-        private string GetPackageVersionPropertyName(NuGetPackage package)
+        private string GetPackageVersionValue(NuGetPackage package)
         {
             var name = package.Name.Replace(".", "");
-            var key = $"{name}FixedVersion:{package.Version}";
-            if (_isFixedMap.Contains(key))
+            var fixedKey = $"{name}FixedVersion:{package.Version}";
+            if (_isFixedMap.Contains(fixedKey))
             {
-                return $"{name}FixedVersion";
+                return $"$({name}FixedVersion)";
             }
 
-            return $"{name}Version";
+            var normalKey = $"{name}Version";
+            if (_packageMap.ContainsKey(normalKey))
+            {
+                return $"$({normalKey})";
+            }
+
+            if (AllowDirectPackageReferenceVersions())
+            {
+                return package.Version;
+            }
+
+            throw new Exception($"Unable to find the package key for {package.Name}");
         }
 
         /// <summary>
         /// Find the last ItemGroup node that has Reference elements in it.
         /// </summary>
-        private XElement FindReferenceItemGroup()
+        private XElement FindReferenceItemGroup() => FindItemGroupWithElement("Reference");
+
+        private XElement FindPackageReferenceItemGroup() => FindItemGroupWithElement("PackageReference");
+
+        private XElement FindItemGroupWithElement(string localName)
         {
             XElement e = null;
 
             var groups = _document.XPathSelectElements("//mb:ItemGroup", _manager);
             foreach (var group in groups)
             {
-                if (group.Elements().Where(x => x.Name.LocalName == "Reference").Any())
+                if (group.Elements().Where(x => x.Name.LocalName == localName).Any())
                 {
                     e = group;
                 }

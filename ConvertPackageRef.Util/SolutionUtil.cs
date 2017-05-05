@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BuildBoss
+namespace ConvertPackageRef
 {
-    internal static class SolutionUtil
+    public static class SolutionUtil
     {
-        internal static List<ProjectEntry> ParseProjects(string solutionPath)
+        public static List<ProjectEntry> ParseProjects(string solutionPath)
         {
             using (var reader = new StreamReader(solutionPath))
             {

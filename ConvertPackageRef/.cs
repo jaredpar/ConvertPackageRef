@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BuildBoss
 {
-    internal enum ProjectFileType
+    public enum ProjectFileType
     {
         CSharp,
         Basic,

@@ -64,6 +64,7 @@ namespace RepoUtil
                 }
             }
 
+            version = version.TrimStart('[').TrimEnd(']');
             return new NuGetPackage(name, version, excludeCompile);
         }
 
