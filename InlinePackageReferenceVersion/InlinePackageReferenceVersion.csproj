@@ -48,5 +48,11 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ConvertPackageRef.Util\ConvertPackageRef.Util.csproj">
+      <Project>{a47fdb81-ad76-4348-ba47-233310c5dc0c}</Project>
+      <Name>ConvertPackageRef.Util</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

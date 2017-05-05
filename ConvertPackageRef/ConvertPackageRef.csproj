@@ -51,7 +51,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Constants.cs" />
     <Compile Include="FileName.cs" />
     <Compile Include="NuGetPackage.cs" />
     <Compile Include="PackageReferenceConverter.cs" />
