@@ -1,4 +1,5 @@
 ﻿using ConvertPackageRef;
+using ConvertPackageRef.Util;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,7 +17,7 @@ namespace InlinePackageReferenceVersion
     {
         internal static void Main(string[] args)
         {
-            var map = ReadPackageVersionMap();
+            var map = RepoUtil.ReadPackageVersionMap(@"e:\code\roslyn");
             foreach (var solution in args)
             {
                 foreach (var project in SolutionUtil.ParseProjects(solution))
@@ -60,28 +61,5 @@ namespace InlinePackageReferenceVersion
 
             doc.Save(projectFilePath);
         }
-
-        internal static Dictionary<string, string> ReadPackageVersionMap()
-        {
-            var packageVersionMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ReadPackageVersionMapCore(packageVersionMap, @"e:\code\roslyn\build\Targets\Packages.props");
-            ReadPackageVersionMapCore(packageVersionMap, @"e:\code\roslyn\build\Targets\FixedPackages.props");
-            return packageVersionMap;
-        }
-
-        internal static Dictionary<string, string> ReadPackageVersionMapCore(Dictionary<string, string> packageVersionMap, string path)
-        {
-            var doc = XDocument.Load(path);
-            var manager = new XmlNamespaceManager(new NameTable());
-            manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
-            var prop = doc.XPathSelectElements("//mb:PropertyGroup", manager).Single();
-            foreach (var element in prop.Elements())
-            {
-                packageVersionMap.Add(element.Name.LocalName, element.Value.Trim());
-            }
-
-            return packageVersionMap;
-        }
-
     }
 }

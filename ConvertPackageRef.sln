@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InlinePackageReferenceVersi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertPackageRef.Util", "ConvertPackageRef.Util\ConvertPackageRef.Util.csproj", "{A47FDB81-AD76-4348-BA47-233310C5DC0C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertFromLegacy", "ConvertFromLegacy\ConvertFromLegacy.csproj", "{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{A47FDB81-AD76-4348-BA47-233310C5DC0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A47FDB81-AD76-4348-BA47-233310C5DC0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A47FDB81-AD76-4348-BA47-233310C5DC0C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

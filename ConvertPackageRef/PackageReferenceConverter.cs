@@ -37,7 +37,7 @@ namespace ConvertPackageRef
                     continue;
                 }
 
-                var util = new ProjectUtil(projectPath, _packageMap, _isFixedMap);
+                var util = new ProjectConverterUtil(projectPath, _packageMap, _isFixedMap);
                 util.Convert();
             }
         }

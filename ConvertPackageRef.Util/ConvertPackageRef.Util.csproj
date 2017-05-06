@@ -40,6 +40,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ProjectUtil.cs" />
+    <Compile Include="RepoUtil.cs" />
     <Compile Include="SharedUtil.cs" />
     <Compile Include="ProjectEntry.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

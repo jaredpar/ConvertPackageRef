@@ -1,4 +1,4 @@
-﻿using BuildBoss;
+﻿using ConvertPackageRef.Util;
 using Newtonsoft.Json.Linq;
 using RepoUtil;
 using System;
@@ -14,8 +14,9 @@ using System.Xml.XPath;
 
 namespace ConvertPackageRef
 {
-    internal sealed class ProjectUtil
+    internal sealed class ProjectConverterUtil
     {
+        private readonly ProjectUtil _projectUtil;
         private readonly XNamespace _namespace = SharedUtil.MSBuildNamespace;
         private readonly XmlNamespaceManager _manager;
         private readonly Dictionary<string, string> _packageMap;
@@ -23,77 +24,30 @@ namespace ConvertPackageRef
         private readonly string _filePath;
         private readonly XDocument _document;
 
-        internal string ProjectName => Path.GetFileNameWithoutExtension(_filePath);
+        internal string ProjectName => _projectUtil.ProjectName;
 
-        internal bool IsPclProject
+
+        internal ProjectConverterUtil(string filePath, Dictionary<string, string> packageMap, HashSet<string> isFixedMap)
         {
-            get
-            {
-                var elem = _document.XPathSelectElements("//mb:TargetFrameworkIdentifier", _manager).FirstOrDefault();
-                if (elem == null)
-                {
-                    return false;
-                }
-
-                return StringComparer.OrdinalIgnoreCase.Equals(elem.Value, ".NETPortable");
-            }
-        }
-
-        internal bool IsDesktopProject
-        {
-            get
-            {
-                if (IsPclProject)
-                {
-                    return false;
-                }
-
-                var elem = _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).FirstOrDefault();
-                return elem != null;
-            }
-        }
-
-        internal bool IsNewSdk
-        {
-            get
-            {
-                var elem = _document.XPathSelectElements("//mb:TargetFramework", _manager).FirstOrDefault();
-                return elem != null;
-            }
-        }
-
-        internal bool IsSharedProject => Path.GetExtension(_filePath) == ".shproj";
-
-        internal bool IsExe
-        {
-            get
-            {
-                var elem = _document.XPathSelectElements("//mb:OutputType", _manager).FirstOrDefault();
-                return elem != null && StringComparer.OrdinalIgnoreCase.Equals("Exe", elem.Value);
-            }
-        }
-
-        internal ProjectUtil(string filePath, Dictionary<string, string> packageMap, HashSet<string> isFixedMap)
-        {
-            _manager = new XmlNamespaceManager(new NameTable());
-            _manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
+            _projectUtil = new ProjectUtil(filePath);
+            _manager = _projectUtil.Manager;
             _packageMap = packageMap;
             _isFixedMap = isFixedMap;
             _filePath = filePath;
-            _document = XDocument.Load(_filePath);
+            _document = _projectUtil.Document;
         }
 
         internal void Convert()
         {
-            if (IsPclProject)
+            if (_projectUtil.IsPclProject)
             {
                 ConvertPclProject();
             }
-            else if (IsDesktopProject)
+            else if (_projectUtil.IsDesktopProject)
             {
                 ConvertDesktopProject();
             }
-            else if (IsSharedProject || IsNewSdk)
+            else if (_projectUtil.IsSharedProject || _projectUtil.IsNewSdk)
             {
                 // No need to convert
                 return;
@@ -111,8 +65,8 @@ namespace ConvertPackageRef
         {
             var importName = _namespace.GetName("Import");
 
-            var propsElement = FindImportWithName("Settings.props");
-            var targetElement = FindImportWithName("Imports.targets");
+            var propsElement = _projectUtil.FindImportWithName("Settings.props");
+            var targetElement = _projectUtil.FindImportWithName("Imports.targets");
 
             var project = propsElement.Attribute("Project");
             project.Value = Path.Combine(Path.GetDirectoryName(project.Value), "SettingsSdk.props");
@@ -124,7 +78,7 @@ namespace ConvertPackageRef
             _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).Single().Remove();
             MaybeAddPackageTargetFallback(tfElement);
 
-            if (IsExe)
+            if (_projectUtil.IsExe)
             {
                 MaybeAddRuntimeIdentifiers(tfElement);
                 RemoveLegacyNugetProperties();
@@ -152,7 +106,7 @@ namespace ConvertPackageRef
         /// </summary>
         internal string GetTargetFrameworkValue()
         {
-            if (IsExe)
+            if (_projectUtil.IsExe)
             {
                 return "netcoreapp1.1";
             }
@@ -220,13 +174,13 @@ namespace ConvertPackageRef
             JProperty prop = null;
             foreach (var cur in frameworks.Properties())
             {
-                if (cur.Name.ToLower().StartsWith("netcoreapp") && IsExe)
+                if (cur.Name.ToLower().StartsWith("netcoreapp") && _projectUtil.IsExe)
                 {
                     prop = cur;
                     break;
                 }
 
-                if (cur.Name.ToLower().StartsWith("netstandard") && !IsExe)
+                if (cur.Name.ToLower().StartsWith("netstandard") && !_projectUtil.IsExe)
                 {
                     prop = cur;
                     break;
@@ -311,27 +265,6 @@ namespace ConvertPackageRef
                 var e = new XElement(_namespace.GetName("RuntimeIdentifiers"), content);
                 target.AddAfterSelf(e);
             }
-        }
-
-        private XElement FindImportWithName(string fileName)
-        {
-            var all = _document.XPathSelectElements("//mb:Import", _manager);
-            foreach (var e in all)
-            {
-                var project = e.Attribute("Project");
-                if (project == null)
-                {
-                    continue;
-                }
-
-                var name = Path.GetFileName(project.Value);
-                if (StringComparer.OrdinalIgnoreCase.Equals(name, fileName))
-                {
-                    return e;
-                }
-            }
-
-            throw new Exception($"Unable to find Import for {fileName}");
         }
 
         internal void ConvertDesktopProject()
@@ -434,13 +367,13 @@ namespace ConvertPackageRef
 
         private XElement GetPackageReferenceInsertElement()
         {
-            var itemGroup = FindReferenceItemGroup();
+            var itemGroup = _projectUtil.FindReferenceItemGroup();
             if (itemGroup != null)
             {
                 return itemGroup;
             }
 
-            itemGroup = FindPackageReferenceItemGroup();
+            itemGroup = _projectUtil.FindPackageReferenceItemGroup();
             if (itemGroup != null)
             {
                 return itemGroup;
@@ -475,29 +408,6 @@ namespace ConvertPackageRef
             }
 
             throw new Exception($"Unable to find the package key for {package.Name}");
-        }
-
-        /// <summary>
-        /// Find the last ItemGroup node that has Reference elements in it.
-        /// </summary>
-        private XElement FindReferenceItemGroup() => FindItemGroupWithElement("Reference");
-
-        private XElement FindPackageReferenceItemGroup() => FindItemGroupWithElement("PackageReference");
-
-        private XElement FindItemGroupWithElement(string localName)
-        {
-            XElement e = null;
-
-            var groups = _document.XPathSelectElements("//mb:ItemGroup", _manager);
-            foreach (var group in groups)
-            {
-                if (group.Elements().Where(x => x.Name.LocalName == localName).Any())
-                {
-                    e = group;
-                }
-            }
-
-            return e;
         }
     }
 }
