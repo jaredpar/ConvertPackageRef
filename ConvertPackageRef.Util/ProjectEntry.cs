@@ -39,6 +39,10 @@ namespace ConvertPackageRef
     {
         public static readonly Guid FolderProjectType = new Guid("{2150E333-8FDC-42A3-9474-1A3956D46DE8}");
         public static readonly Guid VsixProjectType = new Guid("{82B43B9B-A64C-4715-B499-D71E9CA2BD60}");
+        public static readonly Guid LegacyProjectCSharpProjectType = new Guid("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}");
+        public static readonly Guid LegacyProjectBasicProjectType = new Guid("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}");
+        public static readonly Guid NewProjectCSharpProjectType = new Guid("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}");
+        public static readonly Guid NewProjectBasicProjectType = new Guid("{778DAE3C-4631-46EA-AA77-85C1314464D9}");
 
         public static ProjectFileType GetProjectFileType(string path)
         {

@@ -22,7 +22,7 @@ namespace ConvertPackageRef
                         break;
                     }
 
-                    if (!line.StartsWith("Project"))
+                    if (!IsProjectLine(line))
                     {
                         continue;
 
@@ -34,7 +34,9 @@ namespace ConvertPackageRef
             }
         }
 
-        private static ProjectEntry ParseProjectLine(string line)
+        public static bool IsProjectLine(string line) => line.StartsWith("Project");
+
+        public static ProjectEntry ParseProjectLine(string line)
         {
             var index = 0;
             var typeGuid = ParseStringLiteral(line, ref index);
@@ -46,6 +48,13 @@ namespace ConvertPackageRef
                 name: name,
                 guid: Guid.Parse(guid),
                 typeGuid: Guid.Parse(typeGuid));
+        }
+
+        public static string CreateProjectLine(ProjectEntry entry)
+        {
+            var typeGuid = entry.TypeGuid.ToString("B").ToUpper();
+            var guid = entry.Guid.ToString("B").ToUpper();
+            return $@"Project(""{typeGuid}"") = ""{entry.Name}"", ""{entry.RelativeFilePath}"", ""{guid}""";
         }
 
         private static string ParseStringLiteral(string line, ref int index)

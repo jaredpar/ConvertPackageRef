@@ -6,7 +6,7 @@ using System.Xml;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
-namespace ConvertPackageRef.Util
+namespace ConvertPackageRef
 {
     public sealed class ProjectUtil
     {

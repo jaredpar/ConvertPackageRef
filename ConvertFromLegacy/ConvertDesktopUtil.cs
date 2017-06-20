@@ -54,7 +54,8 @@ namespace ConvertFromLegacy
             var comp = StringComparer.OrdinalIgnoreCase;
             foreach (var elem in Document.XPathSelectElements("//mb:PackageReference", Manager).ToList())
             {
-                var version = elem.Element(versionName).Value.Trim();
+                var versionElement = elem.Element(versionName);
+                var version = (versionElement != null ? versionElement.Value : elem.Attribute("Version").Value).Trim();
                 var name = elem.Attribute("Include").Value.Trim();
                 var newElem = new XElement(elem.Name);
                 newElem.Add(new XAttribute("Include", name));
