@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26405.2
+VisualStudioVersion = 15.0.26621.2
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertPackageRef", "ConvertPackageRef\ConvertPackageRef.csproj", "{F9AA5E1D-ABCE-4D5B-A343-52730778C9C7}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertPackageRef.Util", "ConvertPackageRef.Util\ConvertPackageRef.Util.csproj", "{A47FDB81-AD76-4348-BA47-233310C5DC0C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertFromLegacy", "ConvertFromLegacy\ConvertFromLegacy.csproj", "{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickChange", "QuickChange\QuickChange.csproj", "{0C361A54-21C5-4B02-AE87-BE89A19AA378}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,8 +35,15 @@ Global
 		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4A5C585A-86EE-4C7D-9ED4-05A50075B81E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C361A54-21C5-4B02-AE87-BE89A19AA378}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C361A54-21C5-4B02-AE87-BE89A19AA378}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C361A54-21C5-4B02-AE87-BE89A19AA378}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C361A54-21C5-4B02-AE87-BE89A19AA378}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8451D5C1-DC24-49AE-B7A6-2249E64A90F6}
 	EndGlobalSection
 EndGlobal

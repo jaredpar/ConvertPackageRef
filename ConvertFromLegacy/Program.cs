@@ -59,7 +59,7 @@ namespace ConvertFromLegacy
             impl.Convert("Roslyn.sln");
             impl.Convert("Compilers.sln");
             impl.Convert("CrossPlatform.sln");
-            impl.Convert(@"src\Samples\Samples.sln", convertProjects: false);
+            impl.Convert(@"src\Samples\Samples.sln");
         }
     }
 }
