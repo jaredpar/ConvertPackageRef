@@ -16,7 +16,9 @@ namespace ConvertPackageRef
 
         public XNamespace Namespace => SharedUtil.MSBuildNamespace;
         public string ProjectName => Path.GetFileNameWithoutExtension(FilePath);
-        public bool IsNewSdk => Document.XPathSelectElements("//mb:TargetFramework", Manager).FirstOrDefault() != null;
+        public bool IsNewSdk =>
+            Document.XPathSelectElements("//mb:TargetFramework", Manager).FirstOrDefault() != null ||
+            Document.XPathSelectElements("//mb:TargetFrameworks", Manager).FirstOrDefault() != null;
         public bool IsSharedProject => Path.GetExtension(FilePath) == ".shproj";
         public bool IsExe => Document.XPathSelectElements("//mb:OutputType", Manager).FirstOrDefault() != null;
 

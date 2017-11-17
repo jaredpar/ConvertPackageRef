@@ -1,5 +1,4 @@
-﻿using ConvertPackageRef.Util;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using RepoUtil;
 using System;
 using System.Collections.Generic;

@@ -9,19 +9,19 @@ using System.IO;
 using System.Collections.Immutable;
 using ConvertPackageRef;
 
-namespace RepoUtil
+namespace ConvertPackageRef
 {
-    internal static class ProjectJsonUtil
+    public static class ProjectJsonUtil
     {
         /// <summary>
         /// Does the specified project.json file need to be tracked by our repo util? 
         /// </summary>
-        internal static bool NeedsTracking(string filePath)
+        public static bool NeedsTracking(string filePath)
         {
             return GetDependencies(filePath).Length > 0;
         }
 
-        internal static ImmutableArray<NuGetPackage> GetDependencies(string filePath)
+        public static ImmutableArray<NuGetPackage> GetDependencies(string filePath)
         {
             // Need to track any file that has dependencies
             var obj = JObject.Parse(File.ReadAllText(filePath));
@@ -43,7 +43,7 @@ namespace RepoUtil
         /// <summary
         /// Parse out a dependency entry from the project.json file.
         /// </summary>
-        internal static NuGetPackage ParseDependency(JProperty prop)
+        public static NuGetPackage ParseDependency(JProperty prop)
         {
             var name = prop.Name;
             var excludeCompile = false;
@@ -68,7 +68,7 @@ namespace RepoUtil
             return new NuGetPackage(name, version, excludeCompile);
         }
 
-        internal static IEnumerable<string> GetProjectJsonFiles(string sourcesPath)
+        public static IEnumerable<string> GetProjectJsonFiles(string sourcesPath)
         {
             return Directory.EnumerateFiles(sourcesPath, "*project.json", SearchOption.AllDirectories);
         }

@@ -1,5 +1,4 @@
 ﻿using ConvertPackageRef;
-using ConvertPackageRef.Util;
 using System;
 using System.Collections.Generic;
 using System.IO;
