@@ -15,12 +15,12 @@ namespace QuickChange
     {
         internal static void Main(string[] args)
         {
-            ConvertDirectoryProps(@"E:\code\roslyn\src\Compilers\CSharp\Test\Symbol\CSharpCompilerSymbolTest.csproj");
             var baseDir = @"e:\code\roslyn";
             Convert(baseDir, "Roslyn.sln");
             Convert(baseDir, "Compilers.sln");
-            Convert(baseDir, "CrossPlatform.sln");
             Convert(baseDir, @"src\Samples\Samples.sln");
+            Convert(baseDir, @"src\Setup\DevDivInsertionFiles\DevDivInsertionFiles.sln");
+            Convert(baseDir, @"src\Setup\Templates\Templates.sln");
         }
 
         internal static void Convert(string baseDir, string solutionRelativePath)
@@ -45,11 +45,6 @@ namespace QuickChange
             if (!util.IsNewSdk)
             {
                 return;
-            }
-
-            if (projectFullPath.Contains("DeployCoreClr"))
-            {
-
             }
 
             var doc = util.Document;
@@ -118,7 +113,6 @@ namespace QuickChange
                 return;
             }
 
-
             var doc = util.Document;
             var manager = new XmlNamespaceManager(new NameTable());
             manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
@@ -134,7 +128,7 @@ namespace QuickChange
                 }
 
                 var project = attribute.Value;
-                if (project.Contains("SettingsSdk.props") || project.Contains("Imports.targets"))
+                if (project.Contains("Settings.props") || project.Contains("SettingsSdk.props") || project.Contains("Imports.targets"))
                 {
                     element.Remove();
                 }
@@ -149,6 +143,43 @@ namespace QuickChange
 
             Console.WriteLine($"Processing {Path.GetFileName(projectFullPath)}");
             doc.Save(projectFullPath);
+        }
+
+        /// <summary>
+        /// The Microsoft.NETCore.App reference will cause a warning during restore.
+        /// </summary>
+        internal static bool CleanMicrosoftNetCoreAppReferences(ProjectUtil util, XmlNamespaceManager manager)
+        {
+            if (util.IsMultiTargeted)
+            {
+                return false;
+            }
+
+            var targetPackage = util.IsExe
+                ? "Microsoft.NETCore.App"
+                : "NETStandard.Library";
+
+            var changed = false;
+            var doc = util.Document;
+            var elements = doc.XPathSelectElements($"//mb:PackageReference", manager).ToList();
+            XElement parent = null;
+            foreach (var element in elements)
+            {
+                var item = element.Attribute("Include");
+                if (StringComparer.OrdinalIgnoreCase.Equals(item.Value, targetPackage))
+                {
+                    parent = element.Parent;
+                    element.Remove();
+                    changed = true;
+                }
+            }
+
+            if (parent != null && !parent.Elements().Any())
+            {
+                parent.Remove();
+            }
+
+            return changed;
         }
     }
 }

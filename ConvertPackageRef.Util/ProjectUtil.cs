@@ -16,11 +16,11 @@ namespace ConvertPackageRef
 
         public XNamespace Namespace => SharedUtil.MSBuildNamespace;
         public string ProjectName => Path.GetFileNameWithoutExtension(FilePath);
-        public bool IsNewSdk =>
-            Document.XPathSelectElements("//mb:TargetFramework", Manager).FirstOrDefault() != null ||
-            Document.XPathSelectElements("//mb:TargetFrameworks", Manager).FirstOrDefault() != null;
+        public bool IsNewSdk => TryGetTargetFramework(out _) || IsMultiTargeted;
         public bool IsSharedProject => Path.GetExtension(FilePath) == ".shproj";
-        public bool IsExe => Document.XPathSelectElements("//mb:OutputType", Manager).FirstOrDefault() != null;
+        public bool IsExe => TryGetOutputType(out var outputType) && StringComparer.OrdinalIgnoreCase.Equals("Exe", outputType);
+        public bool IsLibrary => TryGetOutputType(out var outputType) && StringComparer.OrdinalIgnoreCase.Equals("Library", outputType);
+        public bool IsMultiTargeted => Document.XPathSelectElements("//mb:TargetFrameworks", Manager).FirstOrDefault() != null;
 
         public bool IsPclProject
         {
@@ -100,6 +100,23 @@ namespace ConvertPackageRef
             }
 
             return e;
+        }
+
+        public bool TryGetTargetFramework(out string targetFramework) => TryGetElementValue("TargetFramework", out targetFramework);
+
+        public bool TryGetOutputType(out string outputType) => TryGetElementValue("OutputType", out outputType);
+
+        private bool TryGetElementValue(string elementName, out string value)
+        {
+            var element = Document.XPathSelectElements($"//mb:{elementName}", Manager).FirstOrDefault();
+            if (element!= null)
+            {
+                value = element.Value.Trim();
+                return true;
+            }
+
+            value = null;
+            return false;
         }
     }
 }
