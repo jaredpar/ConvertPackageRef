@@ -135,14 +135,30 @@ namespace QuickChange
             }
 
             var projectElement = doc.XPathSelectElement("//mb:Project", manager);
-            var attributes = projectElement.Attributes().Where(x => x.Name.LocalName == "xmlns").ToList();
             var sdkAttr = new XAttribute(XName.Get("Sdk"), "Microsoft.NET.Sdk");
-            attributes.Insert(0, sdkAttr);
             projectElement.Attributes().Remove();
-            projectElement.Add(attributes);
+            projectElement.Add(sdkAttr);
+            StripXmlNamespace(doc);
 
             Console.WriteLine($"Processing {Path.GetFileName(projectFullPath)}");
             doc.Save(projectFullPath);
+        }
+
+        private static void StripXmlNamespace(XDocument document)
+        {
+            void Go(XElement element)
+            {
+                element.Name = element.Name.LocalName;
+                foreach (var child in element.Elements())
+                {
+                    Go(child);
+                }
+            }
+
+            foreach (var element in document.Elements())
+            {
+                Go(element);
+            }
         }
 
         /// <summary>
