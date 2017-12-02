@@ -70,6 +70,7 @@ namespace ConvertFromLegacy
             string newTf;
             switch (elem.Value.Trim())
             {
+                case "v4.6":
                 case "v4.6.0":
                     newTf = "net46";
                     break;
