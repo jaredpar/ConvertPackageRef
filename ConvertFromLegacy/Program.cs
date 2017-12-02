@@ -55,10 +55,7 @@ namespace ConvertFromLegacy
         internal static void Main(string[] args)
         {
             var impl = new Impl(@"e:\code\roslyn");
-            impl.Convert("Roslyn.sln");
-            impl.Convert("Compilers.sln");
-            impl.Convert("CrossPlatform.sln");
-            impl.Convert(@"src\Samples\Samples.sln");
+            impl.Convert(@"src\Setup\Templates\Templates.sln");
         }
     }
 }

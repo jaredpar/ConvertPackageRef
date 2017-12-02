@@ -67,7 +67,19 @@ namespace ConvertFromLegacy
         private void UpdateTargetFramework()
         {
             var elem = Document.XPathSelectElements("//mb:TargetFrameworkVersion", Manager).Single();
-            var tf = new XElement(Namespace.GetName("TargetFramework"), "net46");
+            string newTf;
+            switch (elem.Value.Trim())
+            {
+                case "v4.6.0":
+                    newTf = "net46";
+                    break;
+                case "v4.6.1":
+                    newTf = "net461";
+                    break;
+                default:
+                    throw new Exception($"Did not recognize the TargetFrameworkVersion: {elem.Value}");
+            }
+            var tf = new XElement(Namespace.GetName("TargetFramework"), newTf);
             elem.AddAfterSelf(tf);
             elem.Remove();
         }
