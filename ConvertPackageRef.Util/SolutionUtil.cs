@@ -34,6 +34,8 @@ namespace ConvertPackageRef
             }
         }
 
+        public static IEnumerable<ProjectEntry> ParseLanguageProjects(string solutionPath) => ParseProjects(solutionPath).Where(e => e.ProjectType == ProjectFileType.Basic || e.ProjectType == ProjectFileType.CSharp);
+
         public static bool IsProjectLine(string line) => line.StartsWith("Project");
 
         public static ProjectEntry ParseProjectLine(string line)

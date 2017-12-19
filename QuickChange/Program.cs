@@ -15,160 +15,176 @@ namespace QuickChange
     {
         internal static void Main(string[] args)
         {
-            var baseDir = @"e:\code\roslyn";
-            Print(baseDir, "Roslyn.sln");
-        }
+            var map = getProjectNameMap(@"e:\code\roslyn\Roslyn.sln");
+            convertProjects(@"e:\code\roslyn\Roslyn.sln");
+            convertSolutionEntries(@"e:\code\roslyn\Roslyn.sln");
+            convertSolutionEntries(@"e:\code\roslyn\Compilers.sln");
 
-        internal static void Print(string baseDir, string solutionRelativePath)
-        {
-            var solutionFullPath = Path.Combine(baseDir, solutionRelativePath);
-            var solutionDir = Path.GetDirectoryName(solutionFullPath);
-            foreach (var project in SolutionUtil.ParseProjects(solutionFullPath))
+            Dictionary<string, string> getProjectNameMap(string solutionFilePath)
             {
-                if (project.ProjectType != ProjectFileType.CSharp && project.ProjectType != ProjectFileType.Basic)
+                var local = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var newNames = new HashSet<string>();
+                foreach (var line in ProjectMap)
                 {
-                    continue;
-                }
-
-                var projectFilePath = project.GetFullPath(solutionDir);
-                var util = new ProjectUtil(projectFilePath);
-                Console.WriteLine($"{util.ProjectName}, {util.AssemblyName}");
-            }
-        }
-
-        internal static void Convert(string baseDir, string solutionRelativePath)
-        {
-            var solutionFullPath = Path.Combine(baseDir, solutionRelativePath);
-            var solutionDir = Path.GetDirectoryName(solutionFullPath);
-            foreach (var project in SolutionUtil.ParseProjects(solutionFullPath))
-            {
-                if (project.ProjectType != ProjectFileType.CSharp && project.ProjectType != ProjectFileType.Basic)
-                {
-                    continue;
-                }
-
-                var filePath = Path.Combine(Path.GetDirectoryName(solutionFullPath), project.RelativeFilePath);
-                ConvertDirectoryProps(filePath);
-            }
-        }
-
-        internal static void ConvertProject(string projectFullPath, string solutionDir)
-        {
-            var util = new ProjectUtil(projectFullPath);
-            if (!util.IsNewSdk)
-            {
-                return;
-            }
-
-            var doc = util.MSBuildDocument;
-            var changed = RemoveAll(doc, "ProjectGuid");
-            changed |= CleanProjectReference(util);
-
-            if (changed)
-            {
-                Console.WriteLine($"Processing {Path.GetFileName(projectFullPath)}");
-                doc.Document.Save(projectFullPath);
-            }
-        }
-
-        internal static bool RemoveAll(MSBuildDocument doc, params string[] toRemove)
-        {
-            var found = false;
-            foreach (var item in toRemove)
-            {
-                var element = doc.XPathSelectElements(item).FirstOrDefault();
-                if (element != null)
-                {
-                    element.Remove();
-                    found = true;
-                }
-            }
-
-            return found;
-        }
-
-        internal static bool CleanProjectReference(ProjectUtil util)
-        {
-            var changed = false;
-            var projectDir = Path.GetDirectoryName(util.FilePath);
-            var doc = util.MSBuildDocument;
-            var elements = doc.XPathSelectElements("ProjectReference").ToList();
-            foreach (var element in elements)
-            {
-                var refRelativePath = element.Attribute("Include").Value;
-                var refFullPath = Path.Combine(projectDir, refRelativePath);
-                var refUtil = new ProjectUtil(refFullPath);
-                if (refUtil.IsNewSdk)
-                {
-                    var ns = util.MSBuildDocument.Namespace;
-                    element.Element(ns.GetName("Project"))?.Remove();
-                    element.Element(ns.GetName("Name"))?.Remove();
-                    if (!element.Elements().Any())
+                    var both = line.Split('#');
+                    var oldName = both[0];
+                    var newName = both[1];
+                    if (!newNames.Add(newName))
                     {
-                        var newElem = new XElement(ns.GetName("ProjectReference"));
-                        newElem.Add(new XAttribute("Include", refRelativePath));
-                        element.ReplaceWith(newElem);
+                        throw new Exception($"Duplicate name entries {newName}");
                     }
 
-                    changed = true;
+                    local[oldName] = newName;
+                }
+
+                foreach (var entry in SolutionUtil.ParseLanguageProjects(solutionFilePath))
+                {
+                    if (entry.Name.Contains("NetFX20"))
+                    {
+                        continue;
+                    }
+
+                    if (!local.TryGetValue(entry.Name, out var newName))
+                    {
+                        var util = new ProjectUtil(entry.GetFullPath(solutionFilePath));
+                        var assemblyName = util.AssemblyNameWithoutExtension;
+                        if (!newNames.Add(assemblyName))
+                        {
+                            throw new Exception($"Duplicate name entries {assemblyName}");
+                        }
+                        local[entry.Name] = assemblyName;
+                    }
+                }
+
+                return local;
+            }
+
+            string changeFileName(string path, string newFileName)
+            {
+                var dir = Path.GetDirectoryName(path);
+                var oldFileExt = Path.GetExtension(path);
+                return Path.Combine(dir, newFileName + oldFileExt);
+            }
+
+            void convertProject(ProjectUtil util)
+            {
+                foreach (var refElement in util.MSBuildDocument.XPathSelectElements("ProjectReference"))
+                {
+                    var includeAttr = refElement.Attribute("Include");
+                    var include = includeAttr.Value;
+                    var name = Path.GetFileNameWithoutExtension(include);
+                    if (map.TryGetValue(name, out var newName))
+                    {
+                        includeAttr.SetValue(changeFileName(include, newName));
+                    }
+                }
+
+                if (map.TryGetValue(util.ProjectName, out var newProjectName))
+                {
+                    var assemblyNameElem = util.MSBuildDocument.XPathSelectElement("AssemblyName");
+                    assemblyNameElem?.Remove();
+
+                    if (util.ProjectName != newProjectName)
+                    {
+                        File.Delete(util.FilePath);
+                        util.Document.Save(changeFileName(util.FilePath, newProjectName));
+                    }
+                }
+                else
+                {
+                    util.Document.Save(util.FilePath);
                 }
             }
 
-            return changed;
+            void convertProjects(string solutionFilePath)
+            {
+                foreach (var entry in SolutionUtil.ParseProjects(solutionFilePath))
+                {
+                    if (entry.ProjectType != ProjectFileType.CSharp && entry.ProjectType != ProjectFileType.Basic)
+                    {
+                        continue;
+                    }
+                    var projectUtil = new ProjectUtil(entry.GetFullPath(solutionFilePath));
+                    convertProject(projectUtil);
+                }
+
+            }
+
+            void convertSolutionEntries(string solutionFilePath)
+            {
+                var oldLines = File.ReadAllLines(solutionFilePath);
+                var newLines = new List<string>();
+                foreach (var line in oldLines)
+                {
+                    if (SolutionUtil.IsProjectLine(line))
+                    {
+                        var entry = SolutionUtil.ParseProjectLine(line);
+                        if (map.TryGetValue(entry.Name, out var newName))
+                        {
+                            var newEntry = new ProjectEntry(changeFileName(entry.RelativeFilePath, newName), newName, entry.Guid, entry.TypeGuid);
+                            newLines.Add(SolutionUtil.CreateProjectLine(newEntry));
+                        }
+                        else
+                        {
+                            newLines.Add(line);
+                        }
+                    }
+                    else
+                    {
+                        newLines.Add(line);
+                    }
+                }
+
+                File.WriteAllLines(solutionFilePath, newLines);
+            }
+
         }
 
-        internal static void ConvertDirectoryProps(string projectFullPath)
+        private static readonly string[] ProjectMap = new string[]
         {
-            var util = new ProjectUtil(projectFullPath);
-            if (!util.IsNewSdk)
-            {
-                return;
-            }
+            "CodeAnalysisTest#Microsoft.CodeAnalysis.UnitTests",
+            "VBCSCompilerTests#VBCSCompiler.UnitTests",
+            "CSharpCommandLineTest#Microsoft.CodeAnalysis.CSharp.CommandLine.UnitTests",
+            "CSharpCompilerEmitTest#Microsoft.CodeAnalysis.CSharp.Emit.UnitTests",
+            "CSharpCompilerSemanticTest#Microsoft.CodeAnalysis.CSharp.Semantic.UnitTests",
+            "CSharpCompilerSymbolTest#Microsoft.CodeAnalysis.CSharp.Symbol.UnitTests",
+            "CSharpCompilerSyntaxTest#Microsoft.CodeAnalysis.CSharp.Syntax.UnitTests",
+            "CSharpWinRTTest#Microsoft.CodeAnalysis.CSharp.WinRT.UnitTests",
+            "CompilerTestResources#Microsoft.CodeAnalysis.Compiler.Test.Resources",
+            "CSharpCompilerTestUtilities#Microsoft.CodeAnalysis.CSharp.Test.Utilities",
+            "BasicCompilerTestUtilities#Microsoft.CodeAnalysis.VisualBasic.Test.Utilities",
+            "BasicCommandLineTest#Microsoft.CodeAnalysis.VisualBasic.CommandLine.UnitTests",
+            "BasicCompilerEmitTest#Microsoft.CodeAnalysis.VisualBasic.Emit.UnitTests",
+            "BasicCompilerSemanticTest#Microsoft.CodeAnalysis.VisualBasic.Semantic.UnitTests",
+            "BasicCompilerSymbolTest#Microsoft.CodeAnalysis.VisualBasic.Symbol.UnitTests",
+            "BasicCompilerSyntaxTest#Microsoft.CodeAnalysis.VisualBasic.Syntax.UnitTests",
+            "ServicesTest#Microsoft.CodeAnalysis.Workspaces.UnitTests",
+            "CSharpServicesTest#Microsoft.CodeAnalysis.CSharp.Workspaces.UnitTests",
+            "VisualBasicServicesTest#Microsoft.CodeAnalysis.VisualBasic.Workspaces.UnitTests",
+            "BasicEditorServicesTest#Microsoft.CodeAnalysis.VisualBasic.EditorFeatures.UnitTests",
+            "CSharpEditorServicesTest#Microsoft.CodeAnalysis.CSharp.EditorFeatures.UnitTests",
+            "CSharpEditorServicesTest2#Microsoft.CodeAnalysis.CSharp.EditorFeatures2.UnitTests",
+            "EditorServicesTest#Microsoft.CodeAnalysis.EditorFeatures.UnitTests",
+            "EditorServicesTest2#Microsoft.CodeAnalysis.EditorFeatures2.UnitTests",
+            "ServicesTestUtilities#Microsoft.CodeAnalysis.EditorFeatures.Utilities",
+            "InteractiveHostTest#InteractiveHost.UnitTests",
+            "CSharpVisualStudioTest#Microsoft.VisualStudio.LanguageServices.CSharp.UnitTests",
+            "ServicesVisualStudioTest#Microsoft.VisualStudio.LanguageServices.UnitTests",
+            "CSharpExpressionCompilerTest#Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.ExpressionCompiler.UnitTests",
+            "CSharpResultProviderTest#Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.ResultProvider.UnitTests",
+            "BasicExpressionCompilerTest#Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.ExpressionCompiler.UnitTests",
+            "BasicResultProviderTest#Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.ResultProvider.UnitTests",
+            "ExpressionCompilerTestUtilities#Microsoft.CodeAnalysis.ExpressionEvaluator.ExpressionCompiler.Utilities",
+            "ResultProviderTestUtilities#Microsoft.CodeAnalysis.ExpressionEvaluator.ResultProvider.Utilities",
+            "MSBuildTaskTests#Microsoft.Build.Tasks.CodeAnalysis.UnitTetss",
+            "BasicResultProvider.NetFX20#BasicResultProvider.NetFX20.dll",
+            "CSharpResultProvider.NetFX20#CSharpResultProvider.NetFX20.dll",
+            "TestUtilities#Microsoft.CodeAnalysis.Test.Utilities",
+            "VisualStudioIntegrationTests#Microsoft.VisualStudio.LanguageServices.IntegrationTests",
+            "VisualStudioIntegrationTestUtilities#Microsoft.VisualStudio.LanguageServices.IntegrationTests.Utilities",
+            "ServicesTestUtilities2#Microsoft.CodeAnalysis.EditorFeatures.Test.Utilities",
+            "VisualStudioTestUtilities2#Microsoft.VisualStudio.LanguageServices.Test.Utilities2",
+        };
 
-            var doc = util.MSBuildDocument;
-
-            var elements = doc.XPathSelectElements("Import");
-            foreach (var element in elements.ToList())
-            {
-                // VB uses <Import> for global namespaces
-                var attribute = element.Attribute("Project");
-                if (attribute == null)
-                {
-                    continue;
-                }
-
-                var project = attribute.Value;
-                if (project.Contains("Settings.props") || project.Contains("SettingsSdk.props") || project.Contains("Imports.targets"))
-                {
-                    element.Remove();
-                }
-            }
-
-            var projectElement = doc.XPathSelectElement("Project");
-            var sdkAttr = new XAttribute(XName.Get("Sdk"), "Microsoft.NET.Sdk");
-            projectElement.Attributes().Remove();
-            projectElement.Add(sdkAttr);
-            StripXmlNamespace(doc.Document);
-
-            Console.WriteLine($"Processing {Path.GetFileName(projectFullPath)}");
-            doc.Document.Save(projectFullPath);
-        }
-
-        private static void StripXmlNamespace(XDocument document)
-        {
-            void Go(XElement element)
-            {
-                element.Name = element.Name.LocalName;
-                foreach (var child in element.Elements())
-                {
-                    Go(child);
-                }
-            }
-
-            foreach (var element in document.Elements())
-            {
-                Go(element);
-            }
-        }
     }
 }
