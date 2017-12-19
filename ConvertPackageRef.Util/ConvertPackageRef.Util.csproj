@@ -7,7 +7,7 @@
     <ProjectGuid>{A47FDB81-AD76-4348-BA47-233310C5DC0C}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ConvertPackageRef.Util</RootNamespace>
+    <RootNamespace>ConvertPackageRef</RootNamespace>
     <AssemblyName>ConvertPackageRef.Util</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -20,6 +20,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -28,6 +29,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -43,10 +45,10 @@
     <PackageReference Include="System.ValueTuple" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MSBuildDocument.cs" />
     <Compile Include="NuGetPackage.cs" />
     <Compile Include="ProjectJsonUtil.cs" />
     <Compile Include="ProjectUtil.cs" />
-    <Compile Include="RepoUtil.cs" />
     <Compile Include="SharedUtil.cs" />
     <Compile Include="ProjectEntry.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

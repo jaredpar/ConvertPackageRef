@@ -10,23 +10,31 @@ namespace ConvertPackageRef
 {
     public sealed class ProjectUtil
     {
-        public XmlNamespaceManager Manager { get; }
         public string FilePath { get; }
         public XDocument Document { get; }
-
-        public XNamespace Namespace => SharedUtil.MSBuildNamespace;
+        public MSBuildDocument MSBuildDocument { get; }
         public string ProjectName => Path.GetFileNameWithoutExtension(FilePath);
         public bool IsNewSdk => TryGetTargetFramework(out _) || IsMultiTargeted;
         public bool IsSharedProject => Path.GetExtension(FilePath) == ".shproj";
         public bool IsExe => TryGetOutputType(out var outputType) && StringComparer.OrdinalIgnoreCase.Equals("Exe", outputType);
         public bool IsLibrary => TryGetOutputType(out var outputType) && StringComparer.OrdinalIgnoreCase.Equals("Library", outputType);
-        public bool IsMultiTargeted => Document.XPathSelectElements("//mb:TargetFrameworks", Manager).FirstOrDefault() != null;
+        public bool IsMultiTargeted => MSBuildDocument.XPathSelectElements("TargetFrameworks").FirstOrDefault() != null;
+        public string AssemblyName => $"{AssemblyNameWithoutExtension}." + (IsExe ? "exe" : "dll");
+
+        public string AssemblyNameWithoutExtension
+        {
+            get
+            {
+                var elem = MSBuildDocument.XPathSelectElements("AssemblyName").FirstOrDefault();
+                return elem?.Value.ToString() ?? Path.GetFileNameWithoutExtension(FilePath);
+            }
+        }
 
         public bool IsPclProject
         {
             get
             {
-                var elem = Document.XPathSelectElements("//mb:TargetFrameworkIdentifier", Manager).FirstOrDefault();
+                var elem = MSBuildDocument.XPathSelectElements("TargetFrameworkIdentifier").FirstOrDefault();
                 if (elem == null)
                 {
                     return false;
@@ -45,22 +53,21 @@ namespace ConvertPackageRef
                     return false;
                 }
 
-                var elem = Document.XPathSelectElements("//mb:TargetFrameworkVersion", Manager).FirstOrDefault();
+                var elem = MSBuildDocument.XPathSelectElements("TargetFrameworkVersion").FirstOrDefault();
                 return elem != null;
             }
         }
 
         public ProjectUtil(string filePath)
         {
-            Manager = new XmlNamespaceManager(new NameTable());
-            Manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
             FilePath = filePath;
             Document = XDocument.Load(FilePath);
+            MSBuildDocument = new MSBuildDocument(Document);
         }
 
         public XElement FindImportWithName(string fileName)
         {
-            var all = Document.XPathSelectElements("//mb:Import", Manager);
+            var all = MSBuildDocument.XPathSelectElements("Import");
             foreach (var e in all)
             {
                 var project = e.Attribute("Project");
@@ -90,7 +97,7 @@ namespace ConvertPackageRef
         {
             XElement e = null;
 
-            var groups = Document.XPathSelectElements("//mb:ItemGroup", Manager);
+            var groups = MSBuildDocument.XPathSelectElements("ItemGroup");
             foreach (var group in groups)
             {
                 if (group.Elements().Where(x => x.Name.LocalName == localName).Any())
@@ -108,7 +115,7 @@ namespace ConvertPackageRef
 
         private bool TryGetElementValue(string elementName, out string value)
         {
-            var element = Document.XPathSelectElements($"//mb:{elementName}", Manager).FirstOrDefault();
+            var element = MSBuildDocument.XPathSelectElements(elementName).FirstOrDefault();
             if (element!= null)
             {
                 value = element.Value.Trim();

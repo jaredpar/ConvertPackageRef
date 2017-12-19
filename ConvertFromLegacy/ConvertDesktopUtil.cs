@@ -17,8 +17,8 @@ namespace ConvertFromLegacy
         private readonly Dictionary<string, string> _packageMap;
 
         internal XDocument Document => _projectUtil.Document;
-        internal XmlNamespaceManager Manager => _projectUtil.Manager;
-        internal XNamespace Namespace => _projectUtil.Namespace;
+        internal MSBuildDocument MSBuildDocument => _projectUtil.MSBuildDocument;
+        internal XNamespace Namespace => _projectUtil.MSBuildDocument.Namespace;
 
         internal ConvertDesktopUtil(string filePath, Dictionary<string, string> packageMap)
         {
@@ -51,7 +51,7 @@ namespace ConvertFromLegacy
         {
             var versionName = Namespace.GetName("Version");
             var comp = StringComparer.OrdinalIgnoreCase;
-            foreach (var elem in Document.XPathSelectElements("//mb:PackageReference", Manager).ToList())
+            foreach (var elem in MSBuildDocument.XPathSelectElements("PackageReference").ToList())
             {
                 var versionElement = elem.Element(versionName);
                 var version = (versionElement != null ? versionElement.Value : elem.Attribute("Version").Value).Trim();
@@ -66,7 +66,7 @@ namespace ConvertFromLegacy
 
         private void UpdateTargetFramework()
         {
-            var elem = Document.XPathSelectElements("//mb:TargetFrameworkVersion", Manager).Single();
+            var elem = MSBuildDocument.XPathSelectElements("TargetFrameworkVersion").Single();
             string newTf;
             switch (elem.Value.Trim())
             {

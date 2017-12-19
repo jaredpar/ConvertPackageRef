@@ -21,7 +21,7 @@ namespace ConvertFromLegacy
             internal Impl(string repoDir)
             {
                 RepoDir = repoDir;
-                PackageMap = RepoUtil.ReadPackageVersionMap(repoDir);
+                PackageMap = new Dictionary<string, string>();
             }
 
             internal void Convert(string solutionRelativePath, bool convertProjects = true)

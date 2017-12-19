@@ -16,7 +16,6 @@ namespace InlinePackageReferenceVersion
     {
         internal static void Main(string[] args)
         {
-            var map = RepoUtil.ReadPackageVersionMap(@"e:\code\roslyn");
             foreach (var solution in args)
             {
                 foreach (var project in SolutionUtil.ParseProjects(solution))
@@ -27,7 +26,7 @@ namespace InlinePackageReferenceVersion
                     }
 
                     var filePath = Path.Combine(Path.GetDirectoryName(solution), project.RelativeFilePath);
-                    Convert(filePath, map);
+                    Convert(filePath, new Dictionary<string, string>());
                 }
             }
         }
@@ -35,9 +34,8 @@ namespace InlinePackageReferenceVersion
         internal static void Convert(string projectFilePath, Dictionary<string, string> packageMap)
         {
             var doc = XDocument.Load(projectFilePath);
-            var manager = new XmlNamespaceManager(new NameTable());
-            manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
-            var tf = doc.XPathSelectElements("//mb:TargetFramework", manager).FirstOrDefault();
+            var msbuildDoc = new MSBuildDocument(doc);
+            var tf = msbuildDoc.XPathSelectElements("TargetFramework").FirstOrDefault();
             if (tf != null)
             {
                 return;
@@ -45,8 +43,8 @@ namespace InlinePackageReferenceVersion
 
             Console.WriteLine($"Processing {Path.GetFileName(projectFilePath)}");
 
-            var versionName = SharedUtil.MSBuildNamespace.GetName("Version");
-            foreach (var packageRef in doc.XPathSelectElements("//mb:PackageReference", manager))
+            var versionName = msbuildDoc.Namespace.GetName("Version");
+            foreach (var packageRef in msbuildDoc.XPathSelectElements("PackageReference"))
             {
                 var version = packageRef.Element(versionName);
                 var value = version.Value.Trim();

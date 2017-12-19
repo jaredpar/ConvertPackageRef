@@ -16,8 +16,8 @@ namespace ConvertPackageRef
     internal sealed class ProjectConverterUtil
     {
         private readonly ProjectUtil _projectUtil;
-        private readonly XNamespace _namespace = SharedUtil.MSBuildNamespace;
-        private readonly XmlNamespaceManager _manager;
+        private readonly MSBuildDocument _msbuildDocument;
+        private readonly XNamespace _namespace;
         private readonly Dictionary<string, string> _packageMap;
         private readonly HashSet<string> _isFixedMap;
         private readonly string _filePath;
@@ -29,7 +29,8 @@ namespace ConvertPackageRef
         internal ProjectConverterUtil(string filePath, Dictionary<string, string> packageMap, HashSet<string> isFixedMap)
         {
             _projectUtil = new ProjectUtil(filePath);
-            _manager = _projectUtil.Manager;
+            _msbuildDocument = _projectUtil.MSBuildDocument;
+            _namespace = _msbuildDocument.Namespace;
             _packageMap = packageMap;
             _isFixedMap = isFixedMap;
             _filePath = filePath;
@@ -70,11 +71,11 @@ namespace ConvertPackageRef
             var project = propsElement.Attribute("Project");
             project.Value = Path.Combine(Path.GetDirectoryName(project.Value), "SettingsSdk.props");
 
-            var tfiElement = _document.XPathSelectElements("//mb:TargetFrameworkIdentifier", _manager).Single();
+            var tfiElement = _msbuildDocument.XPathSelectElements("TargetFrameworkIdentifier").Single();
             var tfElement = new XElement(_namespace.GetName("TargetFramework"), GetTargetFrameworkValue());
             tfiElement.AddBeforeSelf(tfElement);
             tfiElement.Remove();
-            _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).Single().Remove();
+            _msbuildDocument.XPathSelectElements("TargetFrameworkVersion").Single().Remove();
             MaybeAddPackageTargetFallback(tfElement);
 
             if (_projectUtil.IsExe)
@@ -83,7 +84,7 @@ namespace ConvertPackageRef
                 RemoveLegacyNugetProperties();
             }
 
-            var tfpElement = _document.XPathSelectElements("//mb:TargetFrameworkProfile", _manager).FirstOrDefault();
+            var tfpElement = _msbuildDocument.XPathSelectElements("TargetFrameworkProfile").FirstOrDefault();
             if (tfpElement != null)
             {
                 tfpElement.Remove();
@@ -142,7 +143,7 @@ namespace ConvertPackageRef
         /// </summary>
         private void RemoveLegacyNugetProperties()
         {
-            var elem = _document.XPathSelectElement("//mb:RuntimeIndentifier", _manager);
+            var elem = _msbuildDocument.XPathSelectElement("RuntimeIndentifier");
             if (elem != null)
             {
                 if (elem.PreviousNode is XComment)
@@ -153,7 +154,7 @@ namespace ConvertPackageRef
                 elem.Remove();
             }
 
-            elem = _document.XPathSelectElement("//mb:NuGetRuntimeIdentifier", _manager);
+            elem = _document.XPathSelectElement("NuGetRuntimeIdentifier");
             elem?.Remove();
         }
 
@@ -271,7 +272,7 @@ namespace ConvertPackageRef
             var itemGroup = GetPackageReferenceInsertElement();
             ConvertPackageReferences(inlineVersion: false);
 
-            var tfvElement = _document.XPathSelectElements("//mb:TargetFrameworkVersion", _manager).Single();
+            var tfvElement = _msbuildDocument.XPathSelectElements("TargetFrameworkVersion").Single();
             MaybeAddRuntimeIdentifiers(tfvElement);
             RemoveProjectJson();
         }
@@ -342,8 +343,8 @@ namespace ConvertPackageRef
 
         private void RemoveProjectJsonElement()
         {
-            var groups = _document.XPathSelectElements("//mb:ItemGroup", _manager);
-            var noneName = XName.Get("None", SharedUtil.MSBuildNamespaceUriRaw);
+            var groups = _msbuildDocument.XPathSelectElements("ItemGroup");
+            var noneName = _namespace.GetName("None");
             foreach (var group in groups.ToList())
             {
                 var noneList = group.Elements(noneName).ToList();
@@ -378,10 +379,10 @@ namespace ConvertPackageRef
                 return itemGroup;
             }
 
-            var groups = _document.XPathSelectElements("//mb:ItemGroup", _manager);
+            var groups = _msbuildDocument.XPathSelectElements("ItemGroup");
             var last = groups.Last();
             var next = last.NextNode;
-            itemGroup = new XElement(SharedUtil.MSBuildNamespace.GetName("ItemGroup"));
+            itemGroup = new XElement(_namespace.GetName("ItemGroup"));
             next.AddBeforeSelf(itemGroup);
             return itemGroup;
         }

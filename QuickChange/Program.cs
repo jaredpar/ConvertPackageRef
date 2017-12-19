@@ -16,11 +16,24 @@ namespace QuickChange
         internal static void Main(string[] args)
         {
             var baseDir = @"e:\code\roslyn";
-            Convert(baseDir, "Roslyn.sln");
-            Convert(baseDir, "Compilers.sln");
-            Convert(baseDir, @"src\Samples\Samples.sln");
-            Convert(baseDir, @"src\Setup\DevDivInsertionFiles\DevDivInsertionFiles.sln");
-            Convert(baseDir, @"src\Setup\Templates\Templates.sln");
+            Print(baseDir, "Roslyn.sln");
+        }
+
+        internal static void Print(string baseDir, string solutionRelativePath)
+        {
+            var solutionFullPath = Path.Combine(baseDir, solutionRelativePath);
+            var solutionDir = Path.GetDirectoryName(solutionFullPath);
+            foreach (var project in SolutionUtil.ParseProjects(solutionFullPath))
+            {
+                if (project.ProjectType != ProjectFileType.CSharp && project.ProjectType != ProjectFileType.Basic)
+                {
+                    continue;
+                }
+
+                var projectFilePath = project.GetFullPath(solutionDir);
+                var util = new ProjectUtil(projectFilePath);
+                Console.WriteLine($"{util.ProjectName}, {util.AssemblyName}");
+            }
         }
 
         internal static void Convert(string baseDir, string solutionRelativePath)
@@ -47,25 +60,23 @@ namespace QuickChange
                 return;
             }
 
-            var doc = util.Document;
-            var manager = new XmlNamespaceManager(new NameTable());
-            manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
-            var changed = RemoveAll(doc, manager, "ProjectGuid");
-            changed |= CleanProjectReference(util, manager);
+            var doc = util.MSBuildDocument;
+            var changed = RemoveAll(doc, "ProjectGuid");
+            changed |= CleanProjectReference(util);
 
             if (changed)
             {
                 Console.WriteLine($"Processing {Path.GetFileName(projectFullPath)}");
-                doc.Save(projectFullPath);
+                doc.Document.Save(projectFullPath);
             }
         }
 
-        internal static bool RemoveAll(XDocument doc, XmlNamespaceManager manager, params string[] toRemove)
+        internal static bool RemoveAll(MSBuildDocument doc, params string[] toRemove)
         {
             var found = false;
             foreach (var item in toRemove)
             {
-                var element = doc.XPathSelectElements($"//mb:{item}", manager).FirstOrDefault();
+                var element = doc.XPathSelectElements(item).FirstOrDefault();
                 if (element != null)
                 {
                     element.Remove();
@@ -76,12 +87,12 @@ namespace QuickChange
             return found;
         }
 
-        internal static bool CleanProjectReference(ProjectUtil util, XmlNamespaceManager manager)
+        internal static bool CleanProjectReference(ProjectUtil util)
         {
             var changed = false;
             var projectDir = Path.GetDirectoryName(util.FilePath);
-            var doc = util.Document;
-            var elements = doc.XPathSelectElements($"//mb:ProjectReference", manager).ToList();
+            var doc = util.MSBuildDocument;
+            var elements = doc.XPathSelectElements("ProjectReference").ToList();
             foreach (var element in elements)
             {
                 var refRelativePath = element.Attribute("Include").Value;
@@ -89,11 +100,12 @@ namespace QuickChange
                 var refUtil = new ProjectUtil(refFullPath);
                 if (refUtil.IsNewSdk)
                 {
-                    element.Element(SharedUtil.MSBuildNamespace.GetName("Project"))?.Remove();
-                    element.Element(SharedUtil.MSBuildNamespace.GetName("Name"))?.Remove();
+                    var ns = util.MSBuildDocument.Namespace;
+                    element.Element(ns.GetName("Project"))?.Remove();
+                    element.Element(ns.GetName("Name"))?.Remove();
                     if (!element.Elements().Any())
                     {
-                        var newElem = new XElement(SharedUtil.MSBuildNamespace.GetName("ProjectReference"));
+                        var newElem = new XElement(ns.GetName("ProjectReference"));
                         newElem.Add(new XAttribute("Include", refRelativePath));
                         element.ReplaceWith(newElem);
                     }
@@ -113,11 +125,9 @@ namespace QuickChange
                 return;
             }
 
-            var doc = util.Document;
-            var manager = new XmlNamespaceManager(new NameTable());
-            manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
+            var doc = util.MSBuildDocument;
 
-            var elements = doc.XPathSelectElements($"//mb:Import", manager);
+            var elements = doc.XPathSelectElements("Import");
             foreach (var element in elements.ToList())
             {
                 // VB uses <Import> for global namespaces
@@ -134,14 +144,14 @@ namespace QuickChange
                 }
             }
 
-            var projectElement = doc.XPathSelectElement("//mb:Project", manager);
+            var projectElement = doc.XPathSelectElement("Project");
             var sdkAttr = new XAttribute(XName.Get("Sdk"), "Microsoft.NET.Sdk");
             projectElement.Attributes().Remove();
             projectElement.Add(sdkAttr);
-            StripXmlNamespace(doc);
+            StripXmlNamespace(doc.Document);
 
             Console.WriteLine($"Processing {Path.GetFileName(projectFullPath)}");
-            doc.Save(projectFullPath);
+            doc.Document.Save(projectFullPath);
         }
 
         private static void StripXmlNamespace(XDocument document)
@@ -159,43 +169,6 @@ namespace QuickChange
             {
                 Go(element);
             }
-        }
-
-        /// <summary>
-        /// The Microsoft.NETCore.App reference will cause a warning during restore.
-        /// </summary>
-        internal static bool CleanMicrosoftNetCoreAppReferences(ProjectUtil util, XmlNamespaceManager manager)
-        {
-            if (util.IsMultiTargeted)
-            {
-                return false;
-            }
-
-            var targetPackage = util.IsExe
-                ? "Microsoft.NETCore.App"
-                : "NETStandard.Library";
-
-            var changed = false;
-            var doc = util.Document;
-            var elements = doc.XPathSelectElements($"//mb:PackageReference", manager).ToList();
-            XElement parent = null;
-            foreach (var element in elements)
-            {
-                var item = element.Attribute("Include");
-                if (StringComparer.OrdinalIgnoreCase.Equals(item.Value, targetPackage))
-                {
-                    parent = element.Parent;
-                    element.Remove();
-                    changed = true;
-                }
-            }
-
-            if (parent != null && !parent.Elements().Any())
-            {
-                parent.Remove();
-            }
-
-            return changed;
         }
     }
 }

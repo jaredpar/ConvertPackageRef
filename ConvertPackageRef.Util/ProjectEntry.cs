@@ -32,6 +32,16 @@ namespace ConvertPackageRef
             TypeGuid = typeGuid;
         }
 
+        public string GetFullPath(string solutionFilePath)
+        {
+            if (".sln" == Path.GetExtension(solutionFilePath))
+            {
+                solutionFilePath = Path.GetDirectoryName(solutionFilePath);
+            }
+
+            return Path.Combine(solutionFilePath, RelativeFilePath);
+        }
+
         public override string ToString() => Name;
     }
 

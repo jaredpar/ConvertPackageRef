@@ -14,14 +14,11 @@ namespace ConvertPackageRef
 {
     internal sealed class PackageReferenceConverter
     {
-        private readonly XmlNamespaceManager _manager;
         private readonly Dictionary<string, string> _packageMap;
         private readonly HashSet<string> _isFixedMap;
 
         internal PackageReferenceConverter(Dictionary<string, string> packageMap, HashSet<string> isFixedMap)
         {
-            _manager = new XmlNamespaceManager(new NameTable());
-            _manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
             _isFixedMap = isFixedMap;
             _packageMap = packageMap;
         }

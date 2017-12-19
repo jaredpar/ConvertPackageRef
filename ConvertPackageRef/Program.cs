@@ -62,9 +62,8 @@ namespace ConvertPackageRef
 
         private static List<(string name, string version)> ParsePackages(XDocument doc)
         {
-            var manager = new XmlNamespaceManager(new NameTable());
-            manager.AddNamespace("mb", SharedUtil.MSBuildNamespaceUriRaw);
-            var group = doc.XPathSelectElements("//mb:PropertyGroup", manager).Single();
+            var msbuildDoc = new MSBuildDocument(doc);
+            var group = msbuildDoc.XPathSelectElements("PropertyGroup").Single();
 
             var list = new List<(string name, string version)>();
             foreach (var e in group.Elements())

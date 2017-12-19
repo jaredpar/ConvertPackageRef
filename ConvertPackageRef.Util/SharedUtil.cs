@@ -1,15 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace ConvertPackageRef
 {
     public static class SharedUtil
     {
-        public static string MSBuildNamespaceUriRaw => "http://schemas.microsoft.com/developer/msbuild/2003";
-        public static Uri MSBuildNamespaceUri { get; } = new Uri(MSBuildNamespaceUriRaw);
-        public static XNamespace MSBuildNamespace { get; } = XNamespace.Get(MSBuildNamespaceUriRaw);
         public static Encoding Encoding { get; } = Encoding.UTF8;
 
         /// <summary>
