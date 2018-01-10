@@ -13,6 +13,7 @@ namespace ConvertPackageRef
         public string FilePath { get; }
         public XDocument Document { get; }
         public MSBuildDocument MSBuildDocument { get; }
+        public XNamespace Namespace => MSBuildDocument.Namespace;
         public string ProjectName => Path.GetFileNameWithoutExtension(FilePath);
         public bool IsNewSdk => TryGetTargetFramework(out _) || IsMultiTargeted;
         public bool IsSharedProject => Path.GetExtension(FilePath) == ".shproj";
@@ -65,6 +66,18 @@ namespace ConvertPackageRef
             MSBuildDocument = new MSBuildDocument(Document);
         }
 
+        public XElement GetOrCreateMainPropertyGroup()
+        {
+            var element = FindMainPropertyGroup();
+            if (element == null)
+            {
+                element = new XElement(Namespace.GetName("PropertyGroup"));
+                Document.Root.AddFirst(element);
+            }
+
+            return element;
+        }
+
         public XElement FindImportWithName(string fileName)
         {
             var all = MSBuildDocument.XPathSelectElements("Import");
@@ -92,6 +105,8 @@ namespace ConvertPackageRef
         public XElement FindReferenceItemGroup() => FindItemGroupWithElement("Reference");
 
         public XElement FindPackageReferenceItemGroup() => FindItemGroupWithElement("PackageReference");
+
+        public XElement FindMainPropertyGroup() => Document.Root.Elements(Namespace.GetName("PropertyGroup")).FirstOrDefault();
 
         public XElement FindItemGroupWithElement(string localName)
         {

@@ -32,16 +32,7 @@ namespace ConvertPackageRef
             TypeGuid = typeGuid;
         }
 
-        public string GetFullPath(string solutionFilePath)
-        {
-            if (".sln" == Path.GetExtension(solutionFilePath))
-            {
-                solutionFilePath = Path.GetDirectoryName(solutionFilePath);
-            }
-
-            return Path.Combine(solutionFilePath, RelativeFilePath);
-        }
-
+        public RootedProjectEntry GetRootedProjectEntry(string solutionFilePath) => new RootedProjectEntry(solutionFilePath, this);
         public override string ToString() => Name;
     }
 
@@ -65,6 +56,24 @@ namespace ConvertPackageRef
                     return ProjectFileType.Unknown;
             }
         }
+    }
 
+    public readonly struct RootedProjectEntry
+    {
+        public string FilePath { get; }
+        public ProjectEntry ProjectEntry { get; }
+        public string RelativeFilePath => ProjectEntry.RelativeFilePath;
+        public string Name => ProjectEntry.Name;
+
+        public RootedProjectEntry(string solutionFilePath, ProjectEntry entry)
+        {
+            if (".sln" != Path.GetExtension(solutionFilePath))
+            {
+                throw new Exception("Expected a solution file");
+            }
+
+            FilePath = Path.Combine(Path.GetDirectoryName(solutionFilePath), entry.RelativeFilePath);
+            ProjectEntry = entry;
+        }
     }
 }

@@ -36,6 +36,8 @@ namespace ConvertPackageRef
 
         public static IEnumerable<ProjectEntry> ParseLanguageProjects(string solutionPath) => ParseProjects(solutionPath).Where(e => e.ProjectType == ProjectFileType.Basic || e.ProjectType == ProjectFileType.CSharp);
 
+        public static IEnumerable<RootedProjectEntry> ParseLanguageProjectsRooted(string solutionPath) => ParseLanguageProjects(solutionPath).Select(x => x.GetRootedProjectEntry(solutionPath));
+
         public static bool IsProjectLine(string line) => line.StartsWith("Project");
 
         public static ProjectEntry ParseProjectLine(string line)
