@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
@@ -71,17 +72,15 @@ namespace QuickChange
             "FunctionResolver#Microsoft.CodeAnalysis.ExpressionEvaluator.FunctionResolver#Microsoft.CodeAnalysis.EE.FR",
             "FunctionResolverTest#Microsoft.CodeAnalysis.ExpressionEvaluator.FunctionResolver.UnitTests#Microsoft.CodeAnalysis.EE.FR.UnitTests",
             "InteractiveHostTest#InteractiveHost.UnitTests",
-            "MSBuildTaskTests#Microsoft.Build.Tasks.CodeAnalysis.UnitTetss",
+            "MSBuildTaskTests#Microsoft.Build.Tasks.CodeAnalysis.UnitTests",
             "ResultProvider.Portable#Microsoft.CodeAnalysis.ExpressionEvaluator.ResultProvider#Microsoft.CodeAnalysis.EE.RP",
             "ResultProviderTestUtilities#Microsoft.CodeAnalysis.ExpressionEvaluator.ResultProvider.Utilities#Microsoft.CodeAnalysis.EE.RP.Utilities",
             "ServicesTest#Microsoft.CodeAnalysis.Workspaces.UnitTests",
-            "ServicesTestUtilities#Microsoft.CodeAnalysis.EditorFeatures.Utilities",
             "ServicesTestUtilities2#Microsoft.CodeAnalysis.EditorFeatures.Test.Utilities",
             "ServicesVisualStudioTest#Microsoft.VisualStudio.LanguageServices.UnitTests",
-            "TestUtilities#Microsoft.CodeAnalysis.Test.Utilities",
             "VBCSCompilerTests#VBCSCompiler.UnitTests",
             "VisualBasicServicesTest#Microsoft.CodeAnalysis.VisualBasic.Workspaces.UnitTests",
-            "VisualStudioIntegrationTestUtilities#Microsoft.VisualStudio.LanguageServices.IntegrationTests.Utilities",
+            "VisualStudioIntegrationTestUtilities#Microsoft.VisualStudio.IntegrationTest.Utilities",
             "VisualStudioIntegrationTests#Microsoft.VisualStudio.LanguageServices.IntegrationTests",
             "VisualStudioTestUtilities2#Microsoft.VisualStudio.LanguageServices.Test.Utilities2",
         };
@@ -91,6 +90,7 @@ namespace QuickChange
             "ResultProvider.NetFX20",
             "CSharpResultProvider.NetFX20",
             "BasicResultProvider.NetFX20",
+            "Toolset"
         };
 
         internal static HashSet<string> ExcludedProjectSet { get; } = new HashSet<string>(ProjectExcludeData, StringComparer.OrdinalIgnoreCase);
@@ -266,8 +266,97 @@ namespace QuickChange
             File.WriteAllLines(solutionFilePath, newLines);
         }
 
+        internal void WriteDiff(string filePath)
+        {
+            using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite, FileShare.None))
+            using (var writer = new StreamWriter(stream))
+            {
+                void writeMap(Dictionary<string, string> map)
+                {
+                    writer.WriteLine("");
+                    writer.WriteLine("| Old Name | New Name |");
+                    writer.WriteLine("| -------- | -------- |");
+                    var comparer = StringComparer.OrdinalIgnoreCase;
+                    foreach (var pair in map.OrderBy(x => x.Key).Where(p => !comparer.Equals(p.Key, p.Value)))
+                    {
+                        writer.WriteLine($"| {pair.Key} | {pair.Value} |");
+                    }
+                    writer.WriteLine("");
+                }
+                writer.WriteLine("## Project Names");
+                writeMap(ProjectNameMap);
+                writer.WriteLine("## Assembly Names");
+                writeMap(AssemblyNameMap);
+            }
+        }
+
+        internal void ConvertSwrFile(string filePath)
+        {
+            var pattern = @"^(.*\(OutputPath\)\\(?:Vsix|Exes|Dlls)\\)(?<name>\w+)(\\.*)$";
+            ConvertFile(filePath, pattern);
+        }
+
+        internal void ConvertNuSpecs(string nuspecDirectory)
+        {
+            foreach (var nuspec in Directory.GetFiles(nuspecDirectory, "*.nuspec"))
+            {
+                ConvertNuSpec(nuspec);
+            }
+        }
+
+        internal void ConvertNuSpec(string nuspecFilePath)
+        {
+            var pattern = @"^(.*=""(?:Vsix|Exes|Dlls)(?:\\|\/))(?<name>\w+)(.*)$";
+            ConvertFile(nuspecFilePath, pattern);
+        }
+
+        internal void ConvertSignData(string filePath)
+        {
+            var pattern = @"^(.*""(?:Vsix|Exes|Dlls)\\\\)(?<name>[\w.]+)(\\.*)$";
+            ConvertFile(filePath, pattern);
+        }
+
+        public void ConvertBuildMapFile(string filePath)
+        {
+            ConvertFile(filePath, @"^(\s*add\(""(?:Vsix|Exes|Dlls|UnitTests)\\)(?<name>[\w.]+)(\\.*)$");
+            ConvertFile(filePath, @"^(\s*add.*\\)(?<name>[\w.]+)(\.(?:dll|exe)"".*)$", isProject: false);
+            ConvertFile(filePath, @"^(\s*"")(?<name>[\w.]+)(\.(?:dll|exe)"".*)$", isProject: false);
+            ConvertFile(filePath, @"^(\s*""Vsix\\)(?<name>[\w.]+)(\\.*)$");
+        }
+
+        private void ConvertFile(string filePath, string pattern, bool isProject = true)
+        {
+            bool tryGetChangedName(string oldName, out string newName) => isProject
+                ? TryGetChangedProjectName(oldName, out newName)
+                : TryGetChangedAssemblyName(oldName, out newName);
+
+            var lines = File.ReadAllLines(filePath);
+            var changed = false;
+            var regex = new Regex(pattern, RegexOptions.IgnoreCase);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                var match = regex.Match(line);
+                if (match.Success && tryGetChangedName(match.Groups["name"].Value, out var newName))
+                {
+                    lines[i] = regex.Replace(line, $"$1{newName}$2");
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                File.WriteAllLines(filePath, lines);
+            }
+        }
+
+        internal bool TryGetChangedProjectName(string oldProjectName, out string newProjectName) =>
+            ProjectNameMap.TryGetValue(oldProjectName, out newProjectName) &&
+            !StringComparer.OrdinalIgnoreCase.Equals(oldProjectName, newProjectName);
+
+        internal bool TryGetChangedAssemblyName(string oldAssemblyName, out string newAssemblyName) =>
+            AssemblyNameMap.TryGetValue(oldAssemblyName, out newAssemblyName) &&
+            !StringComparer.OrdinalIgnoreCase.Equals(oldAssemblyName, newAssemblyName);
     }
-
-
 
 }
